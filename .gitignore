@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# 运行时数据（索引/模型缓存）
+.data/
+
+# uv 项目内缓存（本机全局 uv 缓存权限异常，见 pyproject [tool.uv] cache-dir）
+.uv-cache/
+
+# 生成的样例库（由 generate_sample 脚本生成，不入库）
+sample_data/
+
+# 临时目录（下载等）
+.tmp/
+
+# 编辑器/系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

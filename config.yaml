@@ -1,0 +1,72 @@
+# ============================================================
+# 本地离线开发配置
+# 原则：数据源（datasource）是唯一随环境替换的部分，
+#      流水线其余环节（ingest/retrieve/server/eval）与数据源无关。
+# ============================================================
+
+datasource:
+  type: local_dir            # local_dir（本地样例库）| company（公司数据源占位，未实现）
+  params:
+    root: sample_data
+    manifest: sample_data/manifest.csv
+
+# ---- Embedding（离线，模型走 hf-mirror，见 README）----
+embedding:
+  backend: fastembed          # fastembed(ONNX，轻量) | huggingface(sentence-transformers，需 torch)
+  # 说明: fastembed 0.8 不支持 bge-m3；v1 用中英混合的 jina-embeddings-v2-base-zh。
+  #       升级 bge-m3（设计方案 §4.1）: backend 改 huggingface + model 改 BAAI/bge-m3，
+  #       （需先安装 torch+sentence-transformers），建库/检索代码无需改动。
+  model: jinaai/jina-embeddings-v2-base-zh
+  cache_dir: .data/models
+
+# ---- LLM（Ollama；模型拉取后置为 true 启用增强与 rag_answer）----
+llm:
+  provider: ollama
+  base_url: http://localhost:11434
+  model: qwen2.5:7b
+  timeout_sec: 120
+  enabled: true               # Ollama 就绪后置 true（摘要/预设问题/rag_answer 生效）
+
+# ---- 分块策略（设计方案 §5.2：子块用于命中，父块用于作答）----
+chunking:
+  hierarchical: true            # true: HierarchicalNodeParser 父子块；false: 仅 SentenceSplitter 平铺
+  leaf:
+    chunk_size: 512
+    chunk_overlap: 64
+  parent:
+    chunk_size: 1536
+    chunk_overlap: 128
+
+# ---- Chunk 增强（需 LLM，设计方案 §5.3）----
+enhance:
+  enable_summary: true        # SummaryExtractor（chunk 摘要）
+  enable_questions: true      # QuestionsAnsweredExtractor（每个 chunk 5 个预设问题）
+  enable_keywords: true       # KeywordExtractor（关键词，喂 BM25）
+
+# ---- 索引持久化 ----
+index:
+  persist_dir: .data/index          # 正文索引
+  q2q_persist_dir: .data/index_q2q  # Q2Q（预设问题）索引，独立目录
+
+# ---- 检索 ----
+retrieval:
+  top_k: 5                    # 最终返回条数
+  fusion_top_k: 20            # 多路召回各自取多少条参与融合
+  # 融合模式: simple | rrf | relative_score | dist_based
+  # 实测: rrf 的多路共识偏好会淹没"单路强命中"（如 BM25 rank1 的词面精确命中），
+  #       本语料上 simple 最优（20/20，mrr 1.0）；大语料可再对比。
+  fusion_mode: simple
+  similarity_cutoff: 0.5      # 相似度下限（SimilarityPostprocessor，备用）
+  # 上下文压缩（检索后按查询相关性压缩每块，去噪/省 token/提质量）
+  compression:
+    enabled: true
+    mode: embedding            # embedding（按句相似度过滤，快）| llm（LLM 摘录原句，慢但更准）
+    threshold: 0.15            # embedding 模式：句子相似度绝对下限（过滤尾部噪声）
+    keep_ratio: 0.6            # embedding 模式：超下限的句子按相似度保留的比例（0-1）
+    max_sentences: 0           # 0=不限制；>0 每块最多保留句数
+  rerank:
+    enabled: false            # FlagEmbeddingReranker（后续阶段开启）
+    model: BAAI/bge-reranker-v2-m3
+
+server:
+  name: internal-rag

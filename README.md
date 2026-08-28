@@ -1,5 +1,8 @@
 # internal-rag — 公司内部 RAG 系统（本地离线开发版）
 
+> 🚚 **要把代码搬到公司电脑跑（公司文档不出内网）？先看** [`部署到公司电脑.md`](部署到公司电脑.md)
+> （数据边界、离线携带模型、LLM 可选、manifest 权限元数据）。
+
 > 按 `RAG系统设计方案.md` 落地。RAG 是**工具不是 Agent**：以 MCP Server 形式对外暴露
 > `retrieve` / `rag_answer` / `list_knowledge_bases`，后续注册进 AionCore `aionui-mcp`，
 > 由 Hermes 等 Agent 在对话中自主调用。
@@ -61,11 +64,11 @@ rag/
 ## 快速开始
 
 ```powershell
-cd C:\Users\zyw_tx2\Desktop\RAG-build\rag
+# 进入项目目录（示例；换机器/克隆位置以实际为准）
+cd <你克隆或存放 rag 的目录>
 
-# 0. 首次：创建 venv 并安装依赖（pypi 可达即可；若网络受限见下文"网络与模型"）
+# 0. 首次：创建 venv 并安装依赖（pypi 可达即可；若网络受限见"部署到公司电脑.md"）
 uv sync
-
 # 1. 生成"虚拟公司"脱敏样例库（多格式 + manifest.csv 元数据）
 uv run python -m rag.scripts.generate_sample
 

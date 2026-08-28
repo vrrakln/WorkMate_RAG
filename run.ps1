@@ -1,7 +1,8 @@
-# 便捷启动：设置工作区内 uv 缓存 + HF Hub 适配，再转发到 uv run
-# 用法: .\run.ps1 python -m rag.scripts.generate_sample
-$env:UV_CACHE_DIR = "C:\Users\zyw_tx2\Desktop\RAG-build\rag\.uv-cache"
+# 便捷启动（可移植）：所有路径基于脚本所在目录自动推导，换机器无需改动
+# 用法: .\run.ps1 python -m rag.scripts.build_kb
+$root = $PSScriptRoot
+$env:UV_CACHE_DIR = Join-Path $root ".uv-cache"
 $env:HF_HUB_DISABLE_XET = "1"
 $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
-$env:HF_HOME = "C:\Users\zyw_tx2\Desktop\RAG-build\rag\.data\hf"
+$env:HF_HOME = Join-Path $root ".data\hf"
 uv run @args

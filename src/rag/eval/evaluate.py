@@ -38,9 +38,10 @@ def evaluate(cfg: Config, top_k: int = 5) -> dict:
     by_type: dict[str, dict] = {}
     for item in GOLDEN_QUERIES:
         query, expected, qtype = item["query"], item["expected"], item.get("type", "常规")
+        require_all = bool(item.get("require_all", False))  # 对比类：期望文档全部出现才算命中
         result = service.retrieve(query, top_k=top_k)
         got = doc_ids(result)
-        hit = bool(got & set(expected))
+        hit = (got >= set(expected)) if require_all else bool(got & set(expected))
         hits.append(hit)
         # mrr：首个命中文档的 1/排名
         rank = None

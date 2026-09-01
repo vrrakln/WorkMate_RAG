@@ -1,0 +1,59 @@
+# ============================================================
+# RFC 测试专用配置（本机压测用，与公司样例库隔离）
+# - 数据源: rfc_data/（50 个公开 RFC 文本）
+# - LLM 增强关闭（50 个 RFC 全量增强需数小时，测试期不启用）
+# - 索引独立目录（.data/index_rfc），不影响样例库
+# ============================================================
+
+datasource:
+  type: local_dir
+  params:
+    root: rfc_data
+    manifest: rfc_data/manifest.csv   # 可省略（RFC 全公开，无需权限元数据）
+
+embedding:
+  backend: fastembed
+  model: jinaai/jina-embeddings-v2-base-zh
+  cache_dir: .data/models
+
+llm:
+  provider: ollama
+  base_url: http://localhost:11434
+  model: qwen2.5:7b
+  timeout_sec: 120
+  enabled: false              # RFC 测试期关闭 LLM（增强/rag_answer 不可用）
+
+chunking:
+  hierarchical: true
+  leaf:
+    chunk_size: 512
+    chunk_overlap: 64
+  parent:
+    chunk_size: 1536
+    chunk_overlap: 128
+
+enhance:
+  enable_summary: false
+  enable_questions: false
+  enable_keywords: false
+
+index:
+  persist_dir: .data/index_rfc
+  q2q_persist_dir: .data/index_q2q_rfc
+
+retrieval:
+  top_k: 5
+  fusion_top_k: 20
+  fusion_mode: simple
+  compression:
+    enabled: true
+    mode: embedding
+    threshold: 0.15
+    keep_ratio: 0.6
+    max_sentences: 0
+  rerank:
+    enabled: false
+    model: BAAI/bge-reranker-v2-m3
+
+server:
+  name: internal-rag-rfc

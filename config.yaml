@@ -64,6 +64,12 @@ retrieval:
     threshold: 0.15            # embedding 模式：句子相似度绝对下限（过滤尾部噪声）
     keep_ratio: 0.6            # embedding 模式：超下限的句子按相似度保留的比例（0-1）
     max_sentences: 0           # 0=不限制；>0 每块最多保留句数
+  # 时效感知：同族多版本知识"取新不取旧"（metadata: family_id + effective_date）
+  time_aware:
+    enabled: true
+    prefer_latest: true        # 非对比查询：同 family 只保留最新版本
+    hard_filter: false         # 非对比查询：effective_to 过期版本硬排除
+    decay: 0.5                 # 对比查询（问法含"变化/区别/以前"等）：旧版本分数衰减
   rerank:
     enabled: false            # FlagEmbeddingReranker（后续阶段开启）
     model: BAAI/bge-reranker-v2-m3

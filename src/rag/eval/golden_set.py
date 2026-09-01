@@ -67,6 +67,10 @@ GOLDEN_QUERIES = [
     {"query": "公司研发新功能之前要先做什么", "expected": ["rnd_flow"], "type": "干扰"},
     {"query": "云雀科技的产品有哪些", "expected": ["cloud_intro"], "type": "干扰"},
     {"query": "加班到深夜回家，交通费怎么报", "expected": ["expense_note"], "type": "干扰"},
+    # ---------------- 时效（新旧版本冲突，取新不取旧） ----------------
+    {"query": "现在的住宿标准是多少", "expected": ["policy_handbook"], "type": "时效"},
+    {"query": "住宿标准这两年变了吗", "expected": ["policy_handbook", "policy_handbook_2025"], "type": "时效", "require_all": True},
+    {"query": "报销付款周期有什么调整", "expected": ["policy_handbook", "policy_handbook_2025"], "type": "时效", "require_all": True},
 ]
 
 PERMISSION_CASES = [

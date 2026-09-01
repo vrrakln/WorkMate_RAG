@@ -15,6 +15,7 @@ __pycache__/
 
 # 生成的样例库（由 generate_sample 脚本生成，不入库）
 sample_data/
+rfc_data/
 
 # 临时目录（下载等）
 .tmp/

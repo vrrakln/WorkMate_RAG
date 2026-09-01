@@ -40,10 +40,16 @@ class LocalDirectorySource(KnowledgeSource):
                     doc_type=(row.get("doc_type") or f.suffix.lower().lstrip(".")),
                     department=row.get("department", "unknown"),
                     confidentiality=row.get("confidentiality", "public"),
+                    effective_date=row.get("effective_date", ""),
+                    effective_to=row.get("effective_to", ""),
+                    family_id=row.get("family_id", ""),
                     extra={
                         k: v
                         for k, v in row.items()
-                        if k not in {"path", "doc_id", "title", "department", "confidentiality", "doc_type"}
+                        if k not in {
+                            "path", "doc_id", "title", "department", "confidentiality", "doc_type",
+                            "effective_date", "effective_to", "family_id",
+                        }
                     },
                 )
             )

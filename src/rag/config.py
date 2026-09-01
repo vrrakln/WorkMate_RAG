@@ -48,6 +48,10 @@ class Config:
     compression_threshold: float = 0.15
     compression_keep_ratio: float = 0.6
     compression_max_sentences: int = 0
+    time_aware_enabled: bool = True
+    time_aware_prefer_latest: bool = True
+    time_aware_hard_filter: bool = False
+    time_aware_decay: float = 0.5
     rerank_enabled: bool = False
     rerank_model: str = "BAAI/bge-reranker-v2-m3"
 
@@ -110,6 +114,11 @@ class Config:
         cfg.compression_threshold = float(cp.get("threshold", 0.15))
         cfg.compression_keep_ratio = float(cp.get("keep_ratio", 0.6))
         cfg.compression_max_sentences = int(cp.get("max_sentences", 0))
+        ta = rt.get("time_aware", {})
+        cfg.time_aware_enabled = bool(ta.get("enabled", True))
+        cfg.time_aware_prefer_latest = bool(ta.get("prefer_latest", True))
+        cfg.time_aware_hard_filter = bool(ta.get("hard_filter", False))
+        cfg.time_aware_decay = float(ta.get("decay", 0.5))
         rr = rt.get("rerank", {})
         cfg.rerank_enabled = bool(rr.get("enabled", False))
         cfg.rerank_model = rr.get("model", "BAAI/bge-reranker-v2-m3")

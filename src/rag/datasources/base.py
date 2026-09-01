@@ -13,7 +13,7 @@ from typing import BinaryIO, Dict
 
 @dataclass
 class KbDocument:
-    """知识库中的一个文档（含权限元数据）。"""
+    """知识库中的一个文档（含权限元数据 + 时效元数据）。"""
 
     doc_id: str
     file_path: Path
@@ -21,6 +21,10 @@ class KbDocument:
     doc_type: str                # md | pdf | docx | pptx | ...
     department: str = "unknown"
     confidentiality: str = "public"   # public | internal | secret
+    # 时效属性（时间感知 RAG）：同 family_id 的多个版本按 effective_date 取新
+    effective_date: str = ""     # 生效日期（ISO，如 2026-01-01）；空 = 无时效约束
+    effective_to: str = ""       # 失效日期（ISO）；空 = 未过期
+    family_id: str = ""          # 知识族标识（多版本共用）；空 = 单版本
     extra: Dict[str, str] = field(default_factory=dict)
 
     @property
@@ -31,6 +35,12 @@ class KbDocument:
             "department": self.department,
             "confidentiality": self.confidentiality,
         }
+        if self.effective_date:
+            m["effective_date"] = self.effective_date
+        if self.effective_to:
+            m["effective_to"] = self.effective_to
+        if self.family_id:
+            m["family_id"] = self.family_id
         m.update(self.extra)
         return m
 

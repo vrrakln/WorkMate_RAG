@@ -20,6 +20,8 @@ dependencies = [
     "reportlab>=4.2.0",
     "llama-index-llms-openai>=0.7.10",
     "fastmcp>=3.4.7",
+    "openpyxl",
+    "rapidocr-onnxruntime",
 ]
 
 [build-system]

@@ -44,6 +44,8 @@ def create_server() -> FastMCP:
 
         何时用：当回答需要内部资料支撑时，先调用本工具拿到原始依据，再据此作答。
         department 与 confidentiality 为调用方身份，用于权限过滤（部门匹配或公开文档）。
+        注意：同一主题存在多个历史版本时，默认只返回最新生效版本；
+        若需对比新旧版本，请在 query 中说明（如"和以前比""这两年变了吗"）。
         """
         return _get_service().retrieve(
             query=query,
@@ -84,7 +86,8 @@ def create_server() -> FastMCP:
         llm = build_llm(_cfg)  # type: ignore[arg-type]
         prompt = (
             "你是企业内部的智能助手。请严格基于下面提供的内部知识片段回答用户问题；"
-            "如果片段不足以回答，请如实说明。回答用中文，末尾列出引用来源编号。\n\n"
+            "如果片段不足以回答，请如实说明。回答用中文，末尾列出引用来源编号。"
+            "若同一知识存在多个版本片段，以最新生效版本（来源标注中的 effective_date 最大者）为准。\n\n"
             f"【内部知识片段】\n{context}\n\n"
             f"【用户问题】{query}\n\n"
             "【回答】"

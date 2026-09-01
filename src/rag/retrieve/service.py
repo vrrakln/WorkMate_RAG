@@ -1,8 +1,8 @@
-"""检索服务：向量 + Q2Q + 中文 BM25 三路召回 -> 融合 -> 权限过滤 -> top_k。
+"""检索服务：向量 + Q2Q + 中文 BM25 三路召回 -> 融合 -> 权限过滤 -> 时效感知 -> top_k。
 
-对应设计方案 §6.3 Step 2/3/4 与 §5.4（Q2Q 索引）。融合模式可配置
-（config.retrieval.fusion_mode）：默认 simple（实测优于 rrf——rrf 的多路共识
-偏好会淹没"单路强命中"，见开发决策记录）。Rerank 在后续阶段开启。
+对应设计方案 §6.3 Step 2/3/4、§5.4（Q2Q 索引）与时间维度（同族多版本取新）。
+融合模式可配置（config.retrieval.fusion_mode）：默认 simple（实测优于 rrf——
+rrf 的多路共识偏好会淹没"单路强命中"，见开发决策记录）。Rerank 在后续阶段开启。
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from rag.config import Config
 from rag.ingest.pipeline import ensure_settings_llm, load_index, load_nodes, load_parents, load_q2q_index
 from rag.retrieve.bm25_zh import ChineseBM25Retriever
 from rag.retrieve.q2q import Q2QRetriever
+from rag.retrieve.recency import apply_time_awareness
 
 _FUSION_MODES = {
     "rrf": FUSION_MODES.RECIPROCAL_RANK,
@@ -111,6 +112,15 @@ class RetrieverService:
         top_k = top_k or self.cfg.top_k
         raw = self.hybrid.retrieve(query)
         nodes = self._apply_acl(raw, department=department, confidentiality=confidentiality)
+        # 时效感知：同族多版本"取新不取旧"（对比类查询放宽）
+        if self.cfg.time_aware_enabled:
+            nodes = apply_time_awareness(
+                nodes,
+                query,
+                prefer_latest=self.cfg.time_aware_prefer_latest,
+                hard_filter=self.cfg.time_aware_hard_filter,
+                decay=self.cfg.time_aware_decay,
+            )
         results = [self._to_dict(n, query) for n in nodes[:top_k]]
 
         # 上下文压缩：对每块按查询相关性压缩（仅作用于最终 top_k，节省 LLM 调用）
@@ -157,6 +167,9 @@ class RetrieverService:
                 "title": md.get("title"),
                 "department": md.get("department"),
                 "confidentiality": md.get("confidentiality"),
+                "effective_date": md.get("effective_date"),
+                "effective_to": md.get("effective_to"),
+                "family_id": md.get("family_id"),
             },
             "node_id": n.node.node_id,
             # 父子块：子块用于命中，父块用于作答（设计方案 §5.2(4)）
@@ -177,6 +190,8 @@ class RetrieverService:
                     "title": md.get("title"),
                     "department": md.get("department"),
                     "confidentiality": md.get("confidentiality"),
+                    "effective_date": md.get("effective_date"),
+                    "family_id": md.get("family_id"),
                 },
             )
         return sorted(seen.values(), key=lambda d: d["doc_id"])

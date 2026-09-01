@@ -262,15 +262,41 @@ EXPENSE_NOTE_MD = """# 差旅报销补充说明（2026 年 3 月修订）
 2026 年 3 月 15 日
 """
 
+# ---------------------------------------------------------------------------
+# 2025 旧版制度手册（与 2026 版构成"新旧版本冲突"，用于时效感知评测）
+# 仅关键数值不同：住宿标准、报销付款周期；其余章节文本保持一致，
+# 保证两版语义相似度相当——只有时间属性（effective_date）能区分新旧。
+# ---------------------------------------------------------------------------
+
+POLICY_MD_2025 = POLICY_MD.replace(
+    "云雀科技有限公司制度手册（2026 版）", "云雀科技有限公司制度手册（2025 版）"
+).replace(
+    "自 2026 年 1 月 1 日起施行", "自 2025 年 1 月 1 日起施行"
+).replace(
+    """| 城市类别 | 住宿标准（元/晚） |
+| --- | --- |
+| 一线城市（北上广深） | 不超过 500 |
+| 其他城市 | 不超过 350 |
+| 港澳台及境外 | 不超过 800 |""",
+    """| 城市类别 | 住宿标准（元/晚） |
+| --- | --- |
+| 一线城市（北上广深） | 不超过 400 |
+| 其他城市 | 不超过 300 |
+| 港澳台及境外 | 不超过 600 |""",
+).replace(
+    "正常付款周期为审批通过后 5 个工作日内", "正常付款周期为审批通过后 10 个工作日内"
+)
+
 MANIFEST = [
-    # path, doc_id, title, department, confidentiality, doc_type
-    ("公司制度手册.md", "policy_handbook", "公司制度手册（2026版）", "行政部", "internal", "md"),
-    ("新员工入职指南.docx", "onboarding_guide", "新员工入职指南", "人力资源部", "public", "docx"),
-    ("研发流程规范.docx", "rnd_flow", "研发流程规范", "技术部", "internal", "docx"),
-    ("2026年Q1产品规划.pptx", "product_plan_q1", "2026年Q1产品规划", "产品部", "internal", "pptx"),
-    ("云雀云服务产品介绍.pdf", "cloud_intro", "云雀云服务产品介绍", "市场部", "public", "pdf"),
-    ("关于2026年五一假期安排的通知.md", "holiday_notice", "五一假期安排通知", "行政部", "public", "md"),
-    ("差旅报销补充说明.md", "expense_note", "差旅报销补充说明", "财务部", "internal", "md"),
+    # path, doc_id, title, department, confidentiality, doc_type, effective_date, effective_to, family_id
+    ("公司制度手册.md", "policy_handbook", "公司制度手册（2026版）", "行政部", "internal", "md", "2026-01-01", "", "policy_handbook"),
+    ("公司制度手册（2025版）.md", "policy_handbook_2025", "公司制度手册（2025版）", "行政部", "internal", "md", "2025-01-01", "2025-12-31", "policy_handbook"),
+    ("新员工入职指南.docx", "onboarding_guide", "新员工入职指南", "人力资源部", "public", "docx", "", "", ""),
+    ("研发流程规范.docx", "rnd_flow", "研发流程规范", "技术部", "internal", "docx", "", "", ""),
+    ("2026年Q1产品规划.pptx", "product_plan_q1", "2026年Q1产品规划", "产品部", "internal", "pptx", "", "", ""),
+    ("云雀云服务产品介绍.pdf", "cloud_intro", "云雀云服务产品介绍", "市场部", "public", "pdf", "", "", ""),
+    ("关于2026年五一假期安排的通知.md", "holiday_notice", "五一假期安排通知", "行政部", "public", "md", "", "", ""),
+    ("差旅报销补充说明.md", "expense_note", "差旅报销补充说明", "财务部", "internal", "md", "", "", ""),
 ]
 
 
@@ -343,7 +369,10 @@ def write_manifest() -> None:
     p = ROOT / "manifest.csv"
     with open(p, "w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh)
-        w.writerow(["path", "doc_id", "title", "department", "confidentiality", "doc_type"])
+        w.writerow(
+            ["path", "doc_id", "title", "department", "confidentiality", "doc_type",
+             "effective_date", "effective_to", "family_id"]
+        )
         w.writerows(MANIFEST)
 
 
@@ -353,6 +382,7 @@ def main() -> None:
     ROOT.mkdir(parents=True)
 
     write_md("公司制度手册.md", POLICY_MD)
+    write_md("公司制度手册（2025版）.md", POLICY_MD_2025)
     write_docx("新员工入职指南.docx", ONBOARDING_DOCX)
     write_docx("研发流程规范.docx", RND_FLOW_DOCX)
     write_pptx("2026年Q1产品规划.pptx", PRODUCT_PLAN_SLIDES)

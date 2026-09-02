@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Iterable
 
 from llama_index.core import VectorStoreIndex
-from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.retrievers import BaseRetriever, QueryFusionRetriever
 from llama_index.core.retrievers.fusion_retriever import FUSION_MODES
-from llama_index.core.schema import NodeWithScore
+from llama_index.core.schema import NodeWithScore, QueryBundle
 
 from rag.config import Config
 from rag.ingest.pipeline import ensure_settings_llm, load_index, load_nodes, load_parents, load_q2q_index
@@ -28,6 +28,31 @@ _FUSION_MODES = {
 }
 
 
+class _ScoreNormRetriever(BaseRetriever):
+    """分数归一化包装器：把每路召回结果的分数量纲统一到 [0,1]（除以本路最大值）。
+
+    原因：三路分数尺度差异极大——BM25 原始分可达 0-3+，而向量/Q2Q 余弦相似度
+    仅 0.3-0.5；SIMPLE 融合直接求和会被大尺度路（BM25）主导，导致"含大量
+    高频词"的宽泛文档（如帮助中心 FAQ 反复出现"如何"）被过度抬升。
+    归一化后各路贡献可比，融合更均衡（见开发决策记录）。
+    """
+
+    def __init__(self, base: BaseRetriever):
+        super().__init__()
+        self._base = base
+
+    def _retrieve(self, query_bundle: QueryBundle) -> list[NodeWithScore]:
+        hits = self._base.retrieve(query_bundle)
+        scores = [h.score for h in hits if h.score is not None]
+        if not scores:
+            return hits
+        mx = max(scores) or 1.0
+        for h in hits:
+            if h.score is not None:
+                h.score = h.score / mx
+        return hits
+
+
 class RetrieverService:
     """把检索封装成可独立评测、可被 MCP 工具调用的服务。"""
 
@@ -38,7 +63,7 @@ class RetrieverService:
         self.nodes = nodes if nodes is not None else load_nodes(cfg)
         self.parents = load_parents(cfg)  # leaf_id -> {parent_id, parent_text, ...}
 
-        retrievers = [self.index.as_retriever(similarity_top_k=cfg.fusion_top_k)]
+        retrievers = [_ScoreNormRetriever(self.index.as_retriever(similarity_top_k=cfg.fusion_top_k))]
 
         # Q2Q 路：问题索引命中 -> 映射回原 chunk（索引缺失时优雅降级为两路）
         q2q_index = load_q2q_index(cfg)
@@ -48,13 +73,13 @@ class RetrieverService:
                 q2q_index.as_retriever(similarity_top_k=cfg.fusion_top_k),
                 nodes_by_id,
             )
-            retrievers.append(q2q_retriever)
+            retrievers.append(_ScoreNormRetriever(q2q_retriever))
             n_q = len(q2q_index.index_struct.nodes_dict)
             print(f"[retrieve] 已启用 Q2Q 路召回（{n_q} 个问题节点）")
         else:
             print("[retrieve] 未检测到 Q2Q 索引，降级为两路召回")
 
-        retrievers.append(ChineseBM25Retriever(nodes=self.nodes, similarity_top_k=cfg.fusion_top_k))
+        retrievers.append(_ScoreNormRetriever(ChineseBM25Retriever(nodes=self.nodes, similarity_top_k=cfg.fusion_top_k)))
 
         mode = _FUSION_MODES.get(cfg.fusion_mode, FUSION_MODES.SIMPLE)
         self.hybrid = QueryFusionRetriever(
@@ -66,8 +91,15 @@ class RetrieverService:
 
         # 上下文压缩器（检索后按查询相关性压缩每块）
         self._compressor = self._build_compressor(cfg)
+        # Rerank 精排器（融合后、top_k 前，LLM 二次排序）
+        self._reranker = self._build_reranker(cfg)
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _build_reranker(cfg: Config):
+        from rag.retrieve.rerank import build_reranker
+
+        return build_reranker(cfg)
     @staticmethod
     def _build_compressor(cfg: Config):
         if not cfg.compression_enabled:
@@ -121,6 +153,24 @@ class RetrieverService:
                 hard_filter=self.cfg.time_aware_hard_filter,
                 decay=self.cfg.time_aware_decay,
             )
+        # Rerank 精排：对候选片段做 LLM 二次排序（权限/时效已过滤，安全）
+        if self._reranker is not None and nodes:
+            candidates = nodes[: self.cfg.rerank_candidates]
+            reranked = self._reranker.postprocess_nodes(
+                candidates, query_bundle=QueryBundle(query_str=query)
+            )
+            # 补足：rerank 是"改序"不是"过滤"——LLM 可能只选了几条，
+            # 不足 top_k 时按融合序补足，保证召回不因 LLM 判断而下降
+            if len(reranked) < top_k:
+                seen = {n.node.node_id for n in reranked}
+                for n in candidates:
+                    if len(reranked) >= top_k:
+                        break
+                    if n.node.node_id not in seen:
+                        reranked.append(n)
+                        seen.add(n.node.node_id)
+            nodes = reranked
+            print(f"[rerank] {len(candidates)} 候选 -> LLM 选 {len(reranked)} 条（含融合序补足）")
         results = [self._to_dict(n, query) for n in nodes[:top_k]]
 
         # 上下文压缩：对每块按查询相关性压缩（仅作用于最终 top_k，节省 LLM 调用）

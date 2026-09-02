@@ -110,23 +110,59 @@ uv run python -m rag.server.rag_server
 > 踩坑：llama-index 0.14 的 `TextNode` 字段是 `id_`（`node_id=` 传参会静默忽略、生成随机 ID），
 > 导致 Q2Q 的 `source_chunk_id` 与正文节点 ID 失配；`load_nodes` 已改用 `id_=` 修复。
 
-## 评测基线（Golden Set 54 条，含题型分类）
+## 评测基线（Golden Set 58 条，含 Rerank，题型分类）
 
-`eval/golden_set.py` 按设计方案 §7.1 组织题型，评测报告分类型汇总：
+`eval/golden_set.py` 按设计方案 §7.1 组织题型，评测报告分类型汇总（已含 LLM Rerank）：
 
 | 题型 | 数量 | hit_rate | mrr | 说明 |
 | --- | --- | --- | --- | --- |
-| 常规（事实） | 31 | 100% | 1.0000 | 制度/流程/产品/服务细节 |
-| 问法差异 | 6 | 100% | 1.0000 | 口语问法 vs 书面措辞（Q2Q/BM25 补位） |
-| 跨文档对比 | 4 | 100% | 1.0000 | 答案分布在多份文档 |
+| 常规（事实） | 34 | 100% | 0.9706 | 制度/流程/产品/服务细节（含 HTML 帮助中心） |
+| 问法差异 | 6 | 100% | 0.9167 | 口语问法 vs 书面措辞（Q2Q/BM25 补位） |
+| 跨文档对比 | 5 | 100% | 0.9000 | 答案分布在多份文档（含 HTML 5TB 跨文档用例） |
 | 多跳 | 4 | 100% | 1.0000 | 流程串联（申请→审批→报销） |
-| 干扰项 | 6 | 100% | **0.8056** | 词面重叠但答案唯一，正确文档被压到 rank 2-3 |
+| 干扰项 | 6 | 100% | 1.0000 | 词面重叠但答案唯一（归一化 + Rerank 已修复） |
 | 时效 | 3 | 100% | 1.0000 | 新旧版本冲突取新（对比类 require_all 两版都在） |
-| **合计** | **54** | **100%** | **0.9784** | 干扰类为当前唯一短板 |
+| **合计** | **58** | **100%** | **0.9655** | 无 Rerank 基线 mrr 0.9511 → +Rerank 提升至 0.9655 |
 
-> 干扰类正是**后续 Rerank 的 A/B 基准**：如「公司研发新功能之前要先做什么」正确文档
-> （rnd_flow）被语义相近的 product_plan 压到 rank 3；接入 Rerank 后对比该项 mrr 即可量化收益。
 > 权限用例（越权类）独立 5 条，0 泄漏；对比类用例（require_all）要求期望文档**全部**出现才算命中。
+> 说明：本机小语料上 Rerank 收益有限（mrr +0.014）；其价值在语料/候选规模放大后
+> （真实知识库、候选更多、噪声更大）会更显著——模块为可插拔设计，后续可换 bge-reranker。
+
+## Rerank（LLM 精排）
+
+`retrieve/rerank.py`：融合 -> ACL -> 时效 -> **Rerank** -> top_k。LLM（qwen2.5:7b，
+temperature=0 专用实例）对候选片段打分排序，只改序、不降召回：
+
+- `config.retrieval.rerank`：`enabled / mode(llm|flag_embedding 预留) / candidates(10) / top_n(5) / choice_batch_size(10)`；
+- **补足机制**：LLM 只选中几条时，按融合序补足到 top_k——rerank 是"改序"不是"过滤"，
+  避免 LLM 判断失误导致召回下降（实测补足前后：hit_rate 98.3% → 100%）；
+- 实测：58 条 hit_rate 100%、mrr 0.9511 → **0.9655**；确定性（temp 0）验证通过。
+
+> 踩坑：0.14 内置 `LLMRerank` 对 chat model（Ollama）走 `context_messages` 聊天模板，
+> 自定义纯文本 prompt（`{context_str}`）会错配导致提示词残缺 → 自研 `LLMNodeReranker`
+> （自行拼装候选 + 解析 `Doc: N, Relevance: M`，完全可控）。
+
+## HTML 文档解析
+
+`ingest/html_parser.py`（bs4，零额外依赖）支持 .html/.htm：标题层级 → Markdown 标题、
+表格 → Markdown 表格、列表 → 项目符号，并丢弃页面噪声（nav/footer/aside/form/script 等）。
+对齐设计方案 §4.2：**表格不丢**（答案常以表格承载）、结构保留供分块。
+
+- 样例库内置《云雀云服务帮助中心.html》（FAQ + 套餐对比表 + 导航/页脚噪声），解析质量
+  7/7 断言通过（表格/标题/列表保留，导航/页脚丢弃）；
+- 4 条 Golden 用例命中（含跨文档「对象存储单文件最大能传多大」→ cloud_intro + cloud_help）；
+- 新格式接入只需：`readers.py` 加分支 + `local_dir.py` 扩展名 + manifest 一行。
+
+## 融合分数归一化（重要调优结论）
+
+`retrieve/service.py` 的三路召回在融合前各自**除以本路最大值**归一化到 [0,1]：
+
+- 原因：三路分数尺度差异极大（BM25 原始分 0-3+，向量/Q2Q 余弦 0.3-0.5），SIMPLE 融合
+  直接求和会被 BM25 主导——宽泛文档（帮助中心 FAQ 反复出现"如何"）被过度抬升，
+  「加班如何申请」甚至把帮助中心排到制度手册前面；
+- 效果：干扰类 mrr 0.8056 → **1.0 完全修复**；「加班如何申请」恢复制度手册第一；
+  整体 hit_rate 100% 不变；
+- 残留：部分查询出现"同分并列/语义歧义"排序（计费方式、文档协作能力等）——留给 Rerank。
 
 ## 父子块（子块命中、父块作答）
 
@@ -262,8 +298,8 @@ uv run python -m rag.server.rag_server
 ## 路线图对照（设计方案 §8）
 
 - 阶段一（已完成）：样例库 → 分块 → VectorStoreIndex + BM25 → 检索 → MCP 工具 → 评测
-- 阶段二（进行中）：LLM 增强（摘要/预设问题/Q2Q 索引）✅、父子块 ✅、Golden Set 扩充 ✅（51 条）
-  → **剩余：Rerank**（候选 LLMRerank 复用 qwen / bge-reranker-v2-m3 torch 两条路径，
-  以「干扰类 mrr 0.8056」为 A/B 基准）
+- 阶段二（**已完成**）：LLM 增强（摘要/预设问题）✅、Q2Q 索引 ✅、父子块 ✅、上下文压缩 ✅、
+  时效感知 ✅、HTML 解析 ✅、融合归一化 ✅、Golden Set 扩充 ✅（58 条）、**Rerank ✅**
+  （LLM 精排，mrr 0.9511 → 0.9655；bge-reranker-v2-m3 作为 flag_embedding 模式预留）
 - 阶段三：注册进 AionCore（hermes MCP 适配 + 前端），真数据源接入
 - 阶段四：可观测（Phoenix/LlamaTrace）、A/B、CI 回归

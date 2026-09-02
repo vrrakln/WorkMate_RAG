@@ -287,6 +287,61 @@ POLICY_MD_2025 = POLICY_MD.replace(
     "正常付款周期为审批通过后 5 个工作日内", "正常付款周期为审批通过后 10 个工作日内"
 )
 
+HELP_CENTER_HTML = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>云雀云服务帮助中心</title>
+</head>
+<body>
+<nav>
+  <a href="/">首页</a> | <a href="/products">产品</a> | <a href="/help">帮助中心</a> | <a href="/contact">联系我们</a>
+</nav>
+<main>
+  <h1>云雀云服务帮助中心</h1>
+  <p>欢迎使用云雀云服务！这里是常见问题与使用指南。</p>
+
+  <h2>一、账号与安全</h2>
+  <h3>1. 如何重置账号密码</h3>
+  <p>登录页点击「忘记密码」，通过注册邮箱接收重置链接完成重置；企业版账号由企业管理员在管理后台重置。</p>
+  <h3>2. 如何开启两步验证</h3>
+  <p>进入「账号安全」页面，绑定手机号后开启两步验证；开启后每次登录需输入短信验证码。</p>
+
+  <h2>二、云服务器</h2>
+  <h3>3. 云服务器配置如何选择</h3>
+  <ul>
+    <li>2 核 4G：适合小型网站与个人项目；</li>
+    <li>4 核 8G：适合中型业务与数据库应用；</li>
+    <li>8 核 16G：适合高并发与大数据处理。</li>
+  </ul>
+  <h3>4. 云服务器如何升级配置</h3>
+  <p>在控制台选择实例，点击「调整配置」即可在线升配；升配后按新配置计费，无需重启。</p>
+
+  <h2>三、对象存储</h2>
+  <h3>5. 对象存储如何上传大文件</h3>
+  <p>支持分片上传，单文件最大 5TB。网页控制台单次上传上限为 10GB，更大文件请使用 CLI 或 SDK 上传。</p>
+  <h3>6. 文件如何分享给外部人员</h3>
+  <p>生成带时效的分享链接，可设置有效期（1 小时至 30 天）与访问密码。</p>
+
+  <h2>四、服务与计费</h2>
+  <h3>7. SLA 未达标如何申请补偿</h3>
+  <p>月度服务可用性低于 99.9% 时，可在次月 15 日前提交补偿工单，按服务等级协议折算补偿额度。</p>
+  <h3>8. 如何查看账单明细</h3>
+  <p>在「费用中心」查看按资源维度的月度账单，支持导出 CSV。</p>
+
+  <h2>五、套餐对比</h2>
+  <table>
+    <tr><th>套餐</th><th>云服务器</th><th>对象存储</th><th>云数据库</th><th>月付价格</th></tr>
+    <tr><td>入门版</td><td>2 核 4G</td><td>100GB</td><td>1 实例</td><td>99 元</td></tr>
+    <tr><td>标准版</td><td>4 核 8G</td><td>1TB</td><td>3 实例</td><td>399 元</td></tr>
+    <tr><td>旗舰版</td><td>8 核 16G</td><td>5TB</td><td>10 实例</td><td>1299 元</td></tr>
+  </table>
+</main>
+<footer>© 2026 云雀科技有限公司 版权所有 | 客服热线：400-000-0000</footer>
+</body>
+</html>
+"""
+
 MANIFEST = [
     # path, doc_id, title, department, confidentiality, doc_type, effective_date, effective_to, family_id
     ("公司制度手册.md", "policy_handbook", "公司制度手册（2026版）", "行政部", "internal", "md", "2026-01-01", "", "policy_handbook"),
@@ -295,6 +350,7 @@ MANIFEST = [
     ("研发流程规范.docx", "rnd_flow", "研发流程规范", "技术部", "internal", "docx", "", "", ""),
     ("2026年Q1产品规划.pptx", "product_plan_q1", "2026年Q1产品规划", "产品部", "internal", "pptx", "", "", ""),
     ("云雀云服务产品介绍.pdf", "cloud_intro", "云雀云服务产品介绍", "市场部", "public", "pdf", "", "", ""),
+    ("云雀云服务帮助中心.html", "cloud_help", "云雀云服务帮助中心", "技术支持部", "public", "html", "", "", ""),
     ("关于2026年五一假期安排的通知.md", "holiday_notice", "五一假期安排通知", "行政部", "public", "md", "", "", ""),
     ("差旅报销补充说明.md", "expense_note", "差旅报销补充说明", "财务部", "internal", "md", "", "", ""),
 ]
@@ -387,6 +443,7 @@ def main() -> None:
     write_docx("研发流程规范.docx", RND_FLOW_DOCX)
     write_pptx("2026年Q1产品规划.pptx", PRODUCT_PLAN_SLIDES)
     write_pdf("云雀云服务产品介绍.pdf", CLOUD_INTRO_PDF)
+    write_md("云雀云服务帮助中心.html", HELP_CENTER_HTML)
     write_md("关于2026年五一假期安排的通知.md", HOLIDAY_NOTICE_MD)
     write_md("差旅报销补充说明.md", EXPENSE_NOTE_MD)
     write_manifest()

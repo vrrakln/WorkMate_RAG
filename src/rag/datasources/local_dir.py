@@ -7,7 +7,7 @@ from typing import BinaryIO
 
 from rag.datasources.base import KbDocument, KnowledgeSource
 
-_SUPPORTED_EXTS = {".md", ".pdf", ".docx", ".pptx", ".txt"}
+_SUPPORTED_EXTS = {".md", ".pdf", ".docx", ".pptx", ".txt", ".html"}
 
 
 class LocalDirectorySource(KnowledgeSource):

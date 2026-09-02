@@ -71,6 +71,11 @@ GOLDEN_QUERIES = [
     {"query": "现在的住宿标准是多少", "expected": ["policy_handbook"], "type": "时效"},
     {"query": "住宿标准这两年变了吗", "expected": ["policy_handbook", "policy_handbook_2025"], "type": "时效", "require_all": True},
     {"query": "报销付款周期有什么调整", "expected": ["policy_handbook", "policy_handbook_2025"], "type": "时效", "require_all": True},
+    # ---------------- HTML 文档（帮助中心，解析质量验证） ----------------
+    {"query": "如何重置账号密码", "expected": ["cloud_help"], "type": "常规"},
+    {"query": "云服务器配置怎么选择", "expected": ["cloud_help"], "type": "常规"},
+    {"query": "SLA 未达标如何申请补偿", "expected": ["cloud_help"], "type": "常规"},
+    {"query": "对象存储单文件最大能传多大", "expected": ["cloud_intro", "cloud_help"], "type": "跨文档"},
 ]
 
 PERMISSION_CASES = [

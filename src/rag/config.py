@@ -53,6 +53,10 @@ class Config:
     time_aware_hard_filter: bool = False
     time_aware_decay: float = 0.5
     rerank_enabled: bool = False
+    rerank_mode: str = "llm"
+    rerank_candidates: int = 10
+    rerank_top_n: int = 5
+    rerank_choice_batch_size: int = 10
     rerank_model: str = "BAAI/bge-reranker-v2-m3"
 
     server_name: str = "internal-rag"
@@ -121,6 +125,10 @@ class Config:
         cfg.time_aware_decay = float(ta.get("decay", 0.5))
         rr = rt.get("rerank", {})
         cfg.rerank_enabled = bool(rr.get("enabled", False))
+        cfg.rerank_mode = rr.get("mode", "llm")
+        cfg.rerank_candidates = int(rr.get("candidates", 10))
+        cfg.rerank_top_n = int(rr.get("top_n", 5))
+        cfg.rerank_choice_batch_size = int(rr.get("choice_batch_size", 10))
         cfg.rerank_model = rr.get("model", "BAAI/bge-reranker-v2-m3")
 
         srv = raw.get("server", {})

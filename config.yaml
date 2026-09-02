@@ -70,9 +70,14 @@ retrieval:
     prefer_latest: true        # 非对比查询：同 family 只保留最新版本
     hard_filter: false         # 非对比查询：effective_to 过期版本硬排除
     decay: 0.5                 # 对比查询（问法含"变化/区别/以前"等）：旧版本分数衰减
+  # Rerank 精排（融合后、top_k 前）：LLM 重排候选片段（复用 qwen2.5:7b）
   rerank:
-    enabled: false            # FlagEmbeddingReranker（后续阶段开启）
-    model: BAAI/bge-reranker-v2-m3
+    enabled: true
+    mode: llm                  # llm（复用 qwen，零新依赖）| flag_embedding（bge-reranker，需 torch，后续）
+    model: BAAI/bge-reranker-v2-m3   # flag_embedding 模式用（后续接入）
+    candidates: 10             # 参与精排的候选条数（融合 top 中取前 N，控制 LLM 成本）
+    top_n: 5                   # 精排后保留条数
+    choice_batch_size: 10      # LLMRerank 每批候选数（<=candidates 则每查询 1 次 LLM 调用）
 
 server:
   name: internal-rag

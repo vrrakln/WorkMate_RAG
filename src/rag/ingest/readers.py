@@ -17,6 +17,12 @@ def read_document(doc: KbDocument) -> Document:
     if ext in {"md", "txt"}:
         text = doc.file_path.read_text(encoding="utf-8", errors="replace")
 
+    elif ext == "html":
+        from rag.ingest.html_parser import html_to_markdown
+
+        raw = doc.file_path.read_text(encoding="utf-8", errors="replace")
+        text = html_to_markdown(raw)
+
     elif ext == "pdf":
         from llama_index.readers.file import PDFReader
 

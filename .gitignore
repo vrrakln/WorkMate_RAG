@@ -17,8 +17,12 @@ __pycache__/
 sample_data/
 rfc_data/
 
-# 临时目录（下载等）
+# 临时目录与临时文件（下载/调试脚本等）
 .tmp/
+.tmp*
+
+# 一次性实验配置（RFC 压测等，避免误入库）
+config_rfc.yaml
 
 # 编辑器/系统
 .idea/

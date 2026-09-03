@@ -1,0 +1,57 @@
+# ============================================================
+# RFC 测试配置 v2 —— 嵌入模型升级为 BAAI/bge-m3（GPU，需 torch）
+# 与 config_rfc.yaml（jina-zh）并存，索引独立目录，可 A/B 对比
+# ============================================================
+
+datasource:
+  type: local_dir
+  params:
+    root: rfc_data
+    manifest: rfc_data/manifest.csv
+
+embedding:
+  backend: huggingface          # sentence-transformers + torch（需 uv sync --extra gpu-embed）
+  model: BAAI/bge-m3
+  cache_dir: .data/models       # fastembed 缓存（jina-zh 保留在此，不删除）
+
+llm:
+  provider: ollama
+  base_url: http://localhost:11434
+  model: qwen2.5:7b
+  timeout_sec: 120
+  enabled: false
+
+chunking:
+  hierarchical: true
+  leaf:
+    chunk_size: 512
+    chunk_overlap: 64
+  parent:
+    chunk_size: 1536
+    chunk_overlap: 128
+
+enhance:
+  enable_summary: false
+  enable_questions: false
+  enable_keywords: false
+
+index:
+  persist_dir: .data/index_rfc_bgem3
+  q2q_persist_dir: .data/index_q2q_rfc_bgem3
+
+retrieval:
+  top_k: 5
+  fusion_top_k: 20
+  fusion_mode: simple
+  compression:
+    enabled: true
+    mode: embedding
+    threshold: 0.15
+    keep_ratio: 0.6
+    max_sentences: 0
+  rerank:
+    enabled: false
+    model: BAAI/bge-reranker-v2-m3
+
+server:
+  name: internal-rag-rfc-bgem3

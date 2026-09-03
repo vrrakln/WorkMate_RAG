@@ -24,6 +24,16 @@ dependencies = [
     "rapidocr-onnxruntime",
 ]
 
+# 可选：GPU 嵌入（bge-m3 走 sentence-transformers 需要 torch）
+# 本机: uv sync --extra gpu-embed
+# 公司电脑: 普通 uv sync（无需 torch，用 fastembed 的 jina-zh 即可）
+[project.optional-dependencies]
+gpu-embed = [
+    "torch",
+    "sentence-transformers",
+    "llama-index-embeddings-huggingface>=0.4.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

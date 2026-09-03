@@ -19,13 +19,13 @@
 ```
 rag/
 ├── config.yaml                 # 全部配置（数据源/模型/分块/检索）
-├── pyproject.toml              # uv 项目定义（含 [tool.uv] cache-dir 适配）
-├── .env                        # uv run 环境变量（HF Hub 适配）
-├── run.ps1                     # 便捷启动（设置缓存/镜像变量后转发 uv run）
+├── config_rfc_bgem3.yaml       # RFC 压测配置（bge-m3，独立索引，测试用）
+├── pyproject.toml              # uv 项目定义（[tool.uv] cache-dir + gpu-embed 可选组）
+├── run.ps1                     # 便捷启动（路径自动推导，可移植）
 ├── 开发决策记录.md               # 两个阻塞问题的解法 + 环境踩坑记录
 ├── src/rag/
 │   ├── __init__.py             # UTF-8 输出 + Windows 环境补丁加载
-│   ├── _winfix.py              # tempfile.mkdtemp 0700 目录补丁（本机必需）
+│   ├── _winfix.py              # 0700 目录补丁 + llama-index 缓存重定向（本机必需）
 │   ├── config.py               # 配置加载（含 HF Hub 环境适配）
 │   ├── datasources/            # ★ 数据源适配层（唯一随环境替换的部分）
 │   │   ├── base.py             #   KnowledgeSource 抽象 + KbDocument
@@ -257,20 +257,46 @@ temperature=0 专用实例）对候选片段打分排序，只改序、不降召
 | xet 存储 | **必须 `HF_HUB_DISABLE_XET=1`**：xet 缓存路径在本机无写权限 |
 | HF 缓存位置 | `HF_HOME` 指向工作区 `.data\hf`（默认 `~/.cache/huggingface` 无写权限） |
 | 0700 目录陷阱 | 本机对 `mode=0o700` 创建的目录会收紧 ACL，之后无法写入（`tempfile.mkdtemp`/hf_hub 下载事务全中招）。已内置 `src/rag/_winfix.py` 补丁，包导入时自动生效 |
+| llama-index 缓存 | 默认写 `%LOCALAPPDATA%\llama_index`（工作区外无写权限）→ `_winfix.py` 重定向到项目内 `.data/llama_cache` |
+| download.pytorch.org | 直连被重置，**走代理可达**（CUDA torch 安装源：`https://download.pytorch.org/whl/cu126`） |
 | 符号链接 | 无 Developer Mode → symlink 不可用，hf_hub 自动降级为复制（模型 ~150MB，可接受） |
 | 中文控制台 | 已统一 UTF-8 输出（`rag/__init__.py` 里 reconfigure），避免 GBK 编码报错 |
 
-以上适配已固化在 `.env`（uv run 自动加载）、`run.ps1` 与 `config.py`，新环境只需保证
-**pypi 可达**即可复现整个流程。
+以上适配已固化：uv 缓存走 `pyproject.toml` 的 `cache-dir`，HF 相关环境变量与缓存重定向
+由 `config.py` / `_winfix.py` 按项目目录自动推导（无本机绝对路径，仓库可移植），
+新环境只需保证 **pypi 可达**即可复现整个流程。
 
-## Embedding 模型
+## Embedding 模型（双模型并存，可切换）
 
-- v1 默认 **jinaai/jina-embeddings-v2-base-zh**（fastembed/ONNX，中英混合，~150MB，CPU 可跑）。
-  实测命中质量好（Golden Set hit_rate 100%）。
-- fastembed 0.8 不支持 bge-m3。升级到设计方案指定的 **BAAI/bge-m3**：
-  `config.yaml` 里 `embedding.backend: huggingface` + `model: BAAI/bge-m3`
-  （需先 `uv add torch sentence-transformers llama-index-embeddings-huggingface`，代码零改动）。
-- 模型下载引导：`uv run python -m rag.scripts.dl_model`（模型缓存后建库/检索全离线）。
+jina-zh（fastembed，`.data/models`）与 bge-m3（sentence-transformers，`.data/hf/hub`）**并存**，
+切换只改配置 + 重建索引，互不删除：
+
+| 模型 | 后端 | 特点 | 适用 |
+| --- | --- | --- | --- |
+| `jinaai/jina-embeddings-v2-base-zh`（默认） | fastembed/ONNX | 中英混合，CPU 可跑 | 公司电脑（无 torch）、中英混合语料 |
+| `BAAI/bge-m3` | huggingface（sentence-transformers） | 多语种、8192 上下文、**GPU 嵌入快 ~7 倍** | 有 GPU 的机器、追求更高检索精度 |
+
+切换配置（`config.yaml` 或专用 config）：
+
+```yaml
+embedding:
+  backend: huggingface        # fastembed | huggingface
+  model: BAAI/bge-m3          # 或 jinaai/jina-embeddings-v2-base-zh
+```
+
+改后必须重建索引：`uv run python -m rag.scripts.build_kb`（换模型 = 向量全变）。
+
+**bge-m3 启用步骤**（本机已验证）：
+1. 装依赖（可选组 `gpu-embed`——**公司电脑普通 `uv sync` 不会装 torch**）：
+   `uv sync --extra gpu-embed`
+2. 若解析到 CPU 版 torch（pypi 默认），换 CUDA 版（本机 RTX 3060；download.pytorch.org 需代理）：
+   `$env:HTTP_PROXY="http://127.0.0.1:7897"; $env:HTTPS_PROXY=...; uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu126`
+3. 首次建库自动下载模型（2.3GB，公开模型，缓存在 `.data/hf/hub`，之后全离线）。
+
+**实测**（50 个英文 RFC，5152 chunks）：GPU 嵌入 ~5 分钟（34k 字符/s）vs jina-zh CPU ~35 分钟；
+检索精度 bge-m3 对英文技术语料明显更优（5/5 top1 命中正典 RFC，jina-zh 部分被通用文档抢占）。
+
+模型下载引导（fastembed/jina-zh）：`uv run python -m rag.scripts.dl_model`。
 
 ## LLM（Ollama，已启用）
 

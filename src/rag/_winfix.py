@@ -14,6 +14,7 @@ import os
 import random
 import string
 import tempfile
+from pathlib import Path
 
 
 def _mkdtemp_default_mode(suffix: str | None = None, prefix: str | None = None, dir: str | None = None) -> str:
@@ -37,6 +38,24 @@ def _apply() -> None:
     if getattr(_apply, "_done", False):
         return
     tempfile.mkdtemp = _mkdtemp_default_mode  # type: ignore[assignment]
+
+    # llama-index 的 NLTK 等缓存默认写 %LOCALAPPDATA%\llama_index（工作区外，
+    # 沙箱会拒）——重定向到项目内 .data/llama_cache
+    try:
+        import platformdirs
+
+        _project = Path(__file__).resolve().parent.parent.parent
+        _llama_cache = str(_project / ".data" / "llama_cache")
+
+        def _user_cache_dir(name, *a, **k):
+            if name == "llama_index":
+                return _llama_cache
+            return _orig_user_cache_dir(name, *a, **k)
+
+        _orig_user_cache_dir = platformdirs.user_cache_dir
+        platformdirs.user_cache_dir = _user_cache_dir  # type: ignore[assignment]
+    except Exception:  # noqa: BLE001 - 补丁失败不阻塞主流程
+        pass
     _apply._done = True  # type: ignore[attr-defined]
 
 

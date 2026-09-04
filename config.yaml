@@ -10,14 +10,11 @@ datasource:
     root: sample_data
     manifest: sample_data/manifest.csv
 
-# ---- Embedding（离线，模型走 hf-mirror，见 README）----
+# ---- Embedding（默认 bge-m3，走 huggingface 后端；模型缓存到 .data/models）----
 embedding:
-  backend: fastembed          # fastembed(ONNX，轻量) | huggingface(sentence-transformers，需 torch)
-  # 说明: fastembed 0.8 不支持 bge-m3；v1 用中英混合的 jina-embeddings-v2-base-zh。
-  #       升级 bge-m3（设计方案 §4.1）: backend 改 huggingface + model 改 BAAI/bge-m3，
-  #       （需先安装 torch+sentence-transformers），建库/检索代码无需改动。
-  model: jinaai/jina-embeddings-v2-base-zh
-  cache_dir: .data/models
+  backend: huggingface          # huggingface(sentence-transformers + torch，bge-m3) | fastembed(ONNX)
+  model: BAAI/bge-m3            # 多语种（中英）+ 长上下文（8192），设计方案 §4.1 首选
+  cache_dir: .data/models       # 模型下载/缓存目录（models--BAAI--bge-m3）
 
 # ---- LLM（Ollama；模型拉取后置为 true 启用增强与 rag_answer）----
 llm:

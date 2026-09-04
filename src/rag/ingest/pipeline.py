@@ -27,17 +27,14 @@ from rag.ingest.readers import read_document
 
 
 def build_embed_model(cfg: Config):
-    """构建 Embedding 模型。
+    """构建 Embedding 模型（默认 bge-m3）。
 
-    - fastembed: 轻量 ONNX（jina-zh 等），CPU 可跑，模型缓存于 cfg.embed_cache_dir；
-    - huggingface: sentence-transformers（BAAI/bge-m3 等，需 torch，见 pyproject
-      [project.optional-dependencies] gpu-embed）。模型走 HF_HOME（.data/hf），
-      与 fastembed 的缓存目录互不干扰；device 自动选 CUDA（有 GPU 时）。
+    - huggingface（默认）: sentence-transformers（BAAI/bge-m3，需 torch，见 pyproject
+      [project.optional-dependencies] gpu-embed）。模型缓存于 cfg.embed_cache_dir
+      （.data/models），device 自动选 CUDA（有 GPU 时）；
+    - fastembed: 轻量 ONNX（CPU 可跑，缓存于 cfg.embed_cache_dir）——jina-zh 已弃用，
+      仅保留代码路径供未来换轻量模型。
     """
-    if cfg.embed_backend == "fastembed":
-        from llama_index.embeddings.fastembed import FastEmbedEmbedding
-
-        return FastEmbedEmbedding(model_name=cfg.embed_model, cache_dir=cfg.embed_cache_dir)
     if cfg.embed_backend == "huggingface":
         from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
@@ -48,8 +45,15 @@ def build_embed_model(cfg: Config):
             device = "cuda" if torch.cuda.is_available() else "cpu"
         except ImportError:  # torch 未装（未启用 gpu-embed extra）
             pass
-        # 不传 cache_folder：sentence-transformers 走 HF_HOME（模型已在 .data/hf 缓存）
-        return HuggingFaceEmbedding(model_name=cfg.embed_model, device=device)
+        return HuggingFaceEmbedding(
+            model_name=cfg.embed_model,
+            device=device,
+            cache_folder=cfg.embed_cache_dir,  # 模型缓存在 .data/models
+        )
+    if cfg.embed_backend == "fastembed":
+        from llama_index.embeddings.fastembed import FastEmbedEmbedding
+
+        return FastEmbedEmbedding(model_name=cfg.embed_model, cache_dir=cfg.embed_cache_dir)
     raise ValueError(f"未知 embedding.backend: {cfg.embed_backend}")
 
 

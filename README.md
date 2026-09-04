@@ -266,37 +266,32 @@ temperature=0 专用实例）对候选片段打分排序，只改序、不降召
 由 `config.py` / `_winfix.py` 按项目目录自动推导（无本机绝对路径，仓库可移植），
 新环境只需保证 **pypi 可达**即可复现整个流程。
 
-## Embedding 模型（双模型并存，可切换）
+## Embedding 模型（默认 BAAI/bge-m3）
 
-jina-zh（fastembed，`.data/models`）与 bge-m3（sentence-transformers，`.data/hf/hub`）**并存**，
-切换只改配置 + 重建索引，互不删除：
+**默认使用 bge-m3**（sentence-transformers + torch，需可选组 `gpu-embed`），模型缓存于
+`.data/models/models--BAAI--bge-m3`（多语种 1024 维、8192 上下文，中英都强，本机实测
+英文技术语料 5/5 top1 命中正典 RFC；原 jina-zh/fastembed 已弃用并删除，仅保留 fastembed
+代码路径供未来换轻量模型）。
 
-| 模型 | 后端 | 特点 | 适用 |
-| --- | --- | --- | --- |
-| `jinaai/jina-embeddings-v2-base-zh`（默认） | fastembed/ONNX | 中英混合，CPU 可跑 | 公司电脑（无 torch）、中英混合语料 |
-| `BAAI/bge-m3` | huggingface（sentence-transformers） | 多语种、8192 上下文、**GPU 嵌入快 ~7 倍** | 有 GPU 的机器、追求更高检索精度 |
+启用/依赖（一次性）：
 
-切换配置（`config.yaml` 或专用 config）：
-
-```yaml
-embedding:
-  backend: huggingface        # fastembed | huggingface
-  model: BAAI/bge-m3          # 或 jinaai/jina-embeddings-v2-base-zh
+```powershell
+# 1) 装依赖（可选组；纯 CPU 机器也能跑，只是嵌入慢）
+uv sync --extra gpu-embed
+# 2) 有 NVIDIA GPU 时换 CUDA 版 torch（pypi 默认是 CPU 版；download.pytorch.org 需代理）
+$env:HTTP_PROXY="http://127.0.0.1:7897"; $env:HTTPS_PROXY="http://127.0.0.1:7897"
+uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu126
+# 3) 首次预取模型（2.3GB，公开模型；之后全离线自动跳过网络）
+uv run python -m rag.scripts.dl_model
 ```
 
-改后必须重建索引：`uv run python -m rag.scripts.build_kb`（换模型 = 向量全变）。
+- `build_embed_model` 自动选 CUDA（有 GPU）否则 CPU；**模型已缓存时自动进入 HF 离线模式**
+  （避免每次加载做网络检查，无代理时省 ~3 分钟）；
+- 切换轻量模型：`config.yaml` 的 `embedding.backend: fastembed` + 换模型名（需自行下载）；
+- **换模型后必须重建索引**（向量全变）：`uv run python -m rag.scripts.build_kb`。
 
-**bge-m3 启用步骤**（本机已验证）：
-1. 装依赖（可选组 `gpu-embed`——**公司电脑普通 `uv sync` 不会装 torch**）：
-   `uv sync --extra gpu-embed`
-2. 若解析到 CPU 版 torch（pypi 默认），换 CUDA 版（本机 RTX 3060；download.pytorch.org 需代理）：
-   `$env:HTTP_PROXY="http://127.0.0.1:7897"; $env:HTTPS_PROXY=...; uv pip install --reinstall torch --index-url https://download.pytorch.org/whl/cu126`
-3. 首次建库自动下载模型（2.3GB，公开模型，缓存在 `.data/hf/hub`，之后全离线）。
-
-**实测**（50 个英文 RFC，5152 chunks）：GPU 嵌入 ~5 分钟（34k 字符/s）vs jina-zh CPU ~35 分钟；
-检索精度 bge-m3 对英文技术语料明显更优（5/5 top1 命中正典 RFC，jina-zh 部分被通用文档抢占）。
-
-模型下载引导（fastembed/jina-zh）：`uv run python -m rag.scripts.dl_model`。
+> 无 GPU 机器注意：bge-m3 CPU 嵌入慢（几百字符/s），大语料建库耗时显著；建议在公司内
+> 用有 GPU 的机器建库，或接受慢速建库（一次性成本）。
 
 ## LLM（Ollama，已启用）
 

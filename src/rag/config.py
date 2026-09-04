@@ -16,7 +16,7 @@ class Config:
     datasource_type: str = "local_dir"
     datasource_params: dict = field(default_factory=dict)
 
-    embed_backend: str = "fastembed"
+    embed_backend: str = "huggingface"   # 默认 bge-m3（sentence-transformers + torch，需 gpu-embed extra）
     embed_model: str = "BAAI/bge-m3"
     embed_cache_dir: str = ".data/models"
 
@@ -78,7 +78,7 @@ class Config:
             cfg.datasource_params["manifest"] = str(project_dir / cfg.datasource_params["manifest"])
 
         emb = raw.get("embedding", {})
-        cfg.embed_backend = emb.get("backend", "fastembed")
+        cfg.embed_backend = emb.get("backend", "huggingface")
         cfg.embed_model = emb.get("model", "BAAI/bge-m3")
         cfg.embed_cache_dir = str(project_dir / emb.get("cache_dir", ".data/models"))
 
@@ -141,6 +141,10 @@ class Config:
         os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
         os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
         os.environ.setdefault("HF_HOME", str(project_dir / ".data" / "hf"))
+        # 嵌入模型已缓存时强制 HF 离线：避免每次加载都做 HEAD 网络检查/重试（无代理时 ~3 分钟）
+        if "HF_HUB_OFFLINE" not in os.environ:
+            model_dir = Path(cfg.embed_cache_dir) / ("models--" + cfg.embed_model.replace("/", "--"))
+            os.environ["HF_HUB_OFFLINE"] = "1" if model_dir.is_dir() else "0"
         return cfg
 
     def resolve(self, rel: str) -> Path:

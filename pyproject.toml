@@ -28,6 +28,7 @@ dependencies = [
 # 本机: uv sync --extra gpu-embed
 # 公司电脑: 普通 uv sync（无需 torch，用 fastembed 的 jina-zh 即可）
 [project.optional-dependencies]
+images = ["pypdfium2>=4.30,<6"]
 gpu-embed = [
     "torch",
     "sentence-transformers",

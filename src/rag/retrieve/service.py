@@ -220,6 +220,7 @@ class RetrieverService:
                 "effective_date": md.get("effective_date"),
                 "effective_to": md.get("effective_to"),
                 "family_id": md.get("family_id"),
+                "file_path": md.get("file_path"),
             },
             "node_id": n.node.node_id,
             # 父子块：子块用于命中，父块用于作答（设计方案 §5.2(4)）

@@ -34,6 +34,7 @@ class KbDocument:
             "title": self.title,
             "department": self.department,
             "confidentiality": self.confidentiality,
+            "file_path": str(self.file_path),
         }
         if self.effective_date:
             m["effective_date"] = self.effective_date

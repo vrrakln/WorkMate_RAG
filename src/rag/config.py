@@ -15,6 +15,7 @@ class Config:
 
     datasource_type: str = "local_dir"
     datasource_params: dict = field(default_factory=dict)
+    images: dict = field(default_factory=dict)
 
     embed_backend: str = "huggingface"   # 默认 bge-m3（sentence-transformers + torch，需 gpu-embed extra）
     embed_model: str = "BAAI/bge-m3"
@@ -68,6 +69,7 @@ class Config:
             raw = yaml.safe_load(fh) or {}
         project_dir = p.parent
         cfg = cls(project_dir=project_dir, raw=raw)
+        cfg.images = dict(raw.get('images', {}))
 
         ds = raw.get("datasource", {})
         cfg.datasource_type = ds.get("type", "local_dir")

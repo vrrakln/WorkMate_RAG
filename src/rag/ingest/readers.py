@@ -13,22 +13,36 @@ def read_document(doc: KbDocument) -> Document:
     等高级路径在后续阶段接入（DLQ + 人工补录）。
     """
     ext = doc.doc_type.lower()
+    from rag.ingest.image_parser import active_parser, IMAGE_EXTS, read_pdf_images
+    parser = active_parser()
 
     if ext in {"md", "txt"}:
         text = doc.file_path.read_text(encoding="utf-8", errors="replace")
 
-    elif ext == "html":
+    elif ext in {"html", "htm"}:
         from rag.ingest.html_parser import html_to_markdown
 
         raw = doc.file_path.read_text(encoding="utf-8", errors="replace")
-        text = html_to_markdown(raw)
+        handler = None
+        if parser:
+            from pathlib import Path
+            handler = lambda tag: parser.html_image(tag, doc.file_path, Path(parser.options['root']))
+        text = html_to_markdown(raw, image_handler=handler)
 
     elif ext == "pdf":
         from llama_index.readers.file import PDFReader
 
-        reader = PDFReader()
-        pages = reader.load_data(doc.file_path)
-        text = "\n".join(p.text for p in pages)
+        if parser:
+            text = read_pdf_images(doc.file_path, parser)
+        else:
+            reader = PDFReader()
+            pages = reader.load_data(doc.file_path)
+            text = "\n".join(p.text for p in pages)
+
+    elif '.' + ext in IMAGE_EXTS and parser:
+        text = parser.parse(doc.file_path)
+        if text:
+            text = f'[图片来源：{doc.file_path}]\n{text}'
 
     elif ext == "docx":
         from llama_index.readers.file import DocxReader

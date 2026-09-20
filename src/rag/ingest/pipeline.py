@@ -264,8 +264,17 @@ def build_kb(cfg: Config) -> VectorStoreIndex:
     正文索引持久化到 cfg.index_persist_dir，Q2Q 索引独立目录
     （cfg.index_q2q_persist_dir），互不干扰、单索引加载。
     """
-    source = create_source(cfg.datasource_type, **cfg.datasource_params)
-    documents = load_documents(source)
+    from rag.ingest.image_parser import configure_images
+    configure_images(cfg)
+    params = dict(cfg.datasource_params)
+    if cfg.datasource_type == 'local_dir' and cfg.images.get('enabled'):
+        params['include_images'] = cfg.images.get('include_standalone', False)
+    source = create_source(cfg.datasource_type, **params)
+    from rag.ingest.image_parser import release_vision
+    try:
+        documents = load_documents(source)
+    finally:
+        release_vision()
     if not documents:
         raise RuntimeError("数据源未提供任何可解析文档")
 

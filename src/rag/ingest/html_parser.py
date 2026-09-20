@@ -110,9 +110,16 @@ def _walk(el: Tag, out: list[str]) -> None:
         out.append(txt)
 
 
-def html_to_markdown(html: str) -> str:
+def html_to_markdown(html: str, image_handler=None) -> str:
     """HTML 文档 -> 结构化 Markdown 文本（供分块/向量化）。"""
     soup = BeautifulSoup(html, "lxml")
+    if image_handler is not None:
+        for tag in soup.find_all('img'):
+            if any(parent.name in _NOISE_TAGS for parent in tag.parents):
+                continue
+            replacement = soup.new_tag('span')
+            replacement.string = image_handler(tag)
+            tag.replace_with(replacement)
     out: list[str] = []
 
     title = soup.title.get_text(strip=True) if soup.title else ""

@@ -11,6 +11,18 @@ datasource:
     manifest: sample_data/manifest.csv
 
 # ---- Embedding（默认 bge-m3，走 huggingface 后端；模型缓存到 .data/models）----
+images:
+  enabled: false             # 图片转文本入库；详见 docs/image-ingestion.md
+  include_standalone: false  # 默认只处理 HTML 插图和 PDF，避免独立图片缺少父文档权限
+  ocr_enabled: true
+  vision_enabled: false     # 开启需导入 qwen2.5vl:7b（不同于文本 qwen2.5:7b）
+  model: qwen2.5vl:7b
+  base_url: http://127.0.0.1:11435
+  cache_dir: .data/image_cache
+  timeout_sec: 180
+  max_side: 1600
+  pdf_mode: all
+
 embedding:
   backend: huggingface          # huggingface(sentence-transformers + torch，bge-m3) | fastembed(ONNX)
   model: BAAI/bge-m3            # 多语种（中英）+ 长上下文（8192），设计方案 §4.1 首选

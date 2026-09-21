@@ -11,8 +11,28 @@
 from __future__ import annotations
 
 import re
+import codecs
 
 from bs4 import BeautifulSoup, Tag
+from bs4.dammit import EncodingDetector
+
+
+def decode_html(raw: bytes) -> str:
+    """Decode without replacement characters that corrupt text and local image paths."""
+    for bom, encoding in ((codecs.BOM_UTF32_LE, 'utf-32'),
+                          (codecs.BOM_UTF32_BE, 'utf-32'),
+                          (codecs.BOM_UTF16_LE, 'utf-16'),
+                          (codecs.BOM_UTF16_BE, 'utf-16')):
+        if raw.startswith(bom):
+            return raw.decode(encoding, errors='strict')
+    try:
+        return raw.decode('utf-8-sig', errors='strict')
+    except UnicodeDecodeError:
+        declared = EncodingDetector.find_declared_encoding(raw, is_html=True)
+        encoding = codecs.lookup(declared or 'gb18030').name
+        if encoding in ('gb2312', 'gbk'):
+            encoding = 'gb18030'
+        return raw.decode(encoding, errors='strict')
 
 # 页面噪声容器：整块丢弃（不提取其中文本）
 _NOISE_TAGS = {

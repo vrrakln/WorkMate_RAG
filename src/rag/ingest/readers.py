@@ -20,9 +20,9 @@ def read_document(doc: KbDocument) -> Document:
         text = doc.file_path.read_text(encoding="utf-8", errors="replace")
 
     elif ext in {"html", "htm"}:
-        from rag.ingest.html_parser import html_to_markdown
+        from rag.ingest.html_parser import html_to_markdown, decode_html
 
-        raw = doc.file_path.read_text(encoding="utf-8", errors="replace")
+        raw = decode_html(doc.file_path.read_bytes())
         handler = None
         if parser:
             from pathlib import Path

@@ -188,8 +188,9 @@ def image_dependency_signature(path, doc_type):
     digest = hashlib.sha256(json.dumps(opts, sort_keys=True).encode())
     if doc_type.lower() in ('html', 'htm'):
         from bs4 import BeautifulSoup
+        from rag.ingest.html_parser import decode_html
         root = Path(opts.get('root', path.parent))
-        for tag in BeautifulSoup(path.read_text(encoding='utf-8', errors='replace'), 'lxml').find_all('img'):
+        for tag in BeautifulSoup(decode_html(path.read_bytes()), 'lxml').find_all('img'):
             src = tag.get('src', '')
             digest.update(src.encode())
             try:
